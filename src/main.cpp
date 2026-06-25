@@ -16,6 +16,7 @@ void* pRenderWindow;
 void* pRenderLayer;
 void* pRenderBackground;
 bool  g_renderHooksReady = false;
+bool  g_configReloading  = false;
 
 std::vector<std::shared_ptr<CHyprspaceWidget>> g_overviewWidgets;
 
@@ -144,7 +145,7 @@ void onRender(eRenderStage renderStage) {
     if (!g_pHyprOpenGL || !g_pHyprRenderer)
         return;
 
-    const auto currentMonitor = g_pHyprOpenGL->m_renderData.pMonitor;
+    const auto currentMonitor = g_pHyprRenderer->m_renderData.pMonitor;
     if ((renderStage == eRenderStage::RENDER_PRE_WINDOWS || renderStage == eRenderStage::RENDER_POST_WINDOWS || renderStage == eRenderStage::RENDER_LAST_MOMENT) &&
         !currentMonitor) {
         g_oAlpha = -1;
@@ -170,8 +171,8 @@ void onRender(eRenderStage renderStage) {
                     curWindow = dragTarget->window();
                 if (curWindow) {
                     if (widget->isActive()) {
-                        g_oAlpha = curWindow->m_activeInactiveAlpha->goal();
-                        curWindow->m_activeInactiveAlpha->setValueAndWarp(0); // HACK: hide dragged window for the actual pass
+                        g_oAlpha = curWindow->alphaGoal(Desktop::View::WINDOW_ALPHA_ACTIVE);
+                        curWindow->alpha(Desktop::View::WINDOW_ALPHA_ACTIVE)->setValueAndWarp(0); // HACK: hide dragged window for the actual pass
                     }
                 }
                 else g_oAlpha = -1;
@@ -187,10 +188,10 @@ void onRender(eRenderStage renderStage) {
         if (widget != nullptr)
             if (widget->getOwner()) {
                 if (widget->isActive() && currentMonitor->m_activeWorkspace) {
-                    CFramebuffer* sourceFramebuffer = g_pHyprOpenGL->m_renderData.currentFB;
-                    if ((!sourceFramebuffer || !sourceFramebuffer->isAllocated()) && g_pHyprOpenGL->m_renderData.mainFB &&
-                        g_pHyprOpenGL->m_renderData.mainFB->isAllocated())
-                        sourceFramebuffer = g_pHyprOpenGL->m_renderData.mainFB;
+                    SP<IFramebuffer> sourceFramebuffer = g_pHyprRenderer->m_renderData.currentFB;
+                    if ((!sourceFramebuffer || !sourceFramebuffer->isAllocated()) && g_pHyprRenderer->m_renderData.mainFB &&
+                        g_pHyprRenderer->m_renderData.mainFB->isAllocated())
+                        sourceFramebuffer = g_pHyprRenderer->m_renderData.mainFB;
 
                     if (sourceFramebuffer && sourceFramebuffer->isAllocated())
                         widget->captureOverviewMonitorSnapshot(sourceFramebuffer, currentMonitor->activeWorkspaceID());
@@ -202,12 +203,12 @@ void onRender(eRenderStage renderStage) {
                     if (const auto dragTarget = g_layoutManager->dragController()->target())
                         curWindow = dragTarget->window();
                     if (curWindow && pRenderWindow) {
-                        curWindow->m_activeInactiveAlpha->setValueAndWarp(Config::dragAlpha);
+                        curWindow->alpha(Desktop::View::WINDOW_ALPHA_ACTIVE)->setValueAndWarp(Config::dragAlpha);
                         curWindow->m_ruleApplicator->noBlur().unset(Desktop::Types::PRIORITY_SET_PROP);
                         const auto time = Time::steadyNow();
                         (*(tRenderWindow)pRenderWindow)(g_pHyprRenderer.get(), curWindow, widget->getOwner(), time, true, RENDER_PASS_MAIN, false, false);
                         curWindow->m_ruleApplicator->noBlur().unset(Desktop::Types::PRIORITY_SET_PROP);
-                        curWindow->m_activeInactiveAlpha->setValueAndWarp(g_oAlpha);
+                        curWindow->alpha(Desktop::View::WINDOW_ALPHA_ACTIVE)->setValueAndWarp(g_oAlpha);
                     }
                 }
                 g_oAlpha = -1;
@@ -220,9 +221,9 @@ void onRender(eRenderStage renderStage) {
         if (!widget || !widget->getOwner() || widget->isActive() || widget->curYOffset->isBeingAnimated())
             return;
 
-        CFramebuffer* sourceFramebuffer = g_pHyprOpenGL->m_renderData.currentFB;
-        if ((!sourceFramebuffer || !sourceFramebuffer->isAllocated()) && g_pHyprOpenGL->m_renderData.mainFB && g_pHyprOpenGL->m_renderData.mainFB->isAllocated())
-            sourceFramebuffer = g_pHyprOpenGL->m_renderData.mainFB;
+        SP<IFramebuffer> sourceFramebuffer = g_pHyprRenderer->m_renderData.currentFB;
+        if ((!sourceFramebuffer || !sourceFramebuffer->isAllocated()) && g_pHyprRenderer->m_renderData.mainFB && g_pHyprRenderer->m_renderData.mainFB->isAllocated())
+            sourceFramebuffer = g_pHyprRenderer->m_renderData.mainFB;
 
         if (!sourceFramebuffer || !sourceFramebuffer->isAllocated() || !currentMonitor->m_activeWorkspace)
             return;
@@ -457,6 +458,8 @@ void* findFunctionBySymbol(HANDLE inHandle, const std::string func, const std::s
 }
 
 void reloadConfig() {
+    g_configReloading = true;
+
     loadPluginColor("plugin:overview:panelColor", Config::panelBaseColor);
     loadPluginColor("plugin:overview:panelBorderColor", Config::panelBorderColor);
     loadPluginColor("plugin:overview:workspaceActiveBackground", Config::workspaceActiveBackground);
@@ -505,10 +508,12 @@ void reloadConfig() {
             continue;
 
         widget->updateConfig();
-        widget->hide();
-        IPointer::SSwipeEndEvent dummy;
-        dummy.cancelled = true;
-        widget->endSwipe(dummy);
+        if (widget->isActive() || widget->isSwiping()) {
+            widget->hide();
+            IPointer::SSwipeEndEvent dummy;
+            dummy.cancelled = true;
+            widget->endSwipe(dummy);
+        }
     }
 
     loadPluginConfig("plugin:overview:dragAlpha", Config::dragAlpha);
@@ -521,6 +526,8 @@ void reloadConfig() {
         numWorkspaces = std::any_cast<Hyprlang::INT>(numWorkspacesConfig->getValue());
 
     // TODO: schedule frame for monitor?
+
+    g_configReloading = false;
 }
 
 void registerMonitors() {
@@ -613,9 +620,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE inHandle) {
 
     g_pSwitchWorkspaceHook = Event::bus()->m_events.workspace.active.listen(onWorkspaceChange);
 
-    pRenderWindow = findFunctionBySymbol(pHandle, "renderWindow", "CHyprRenderer::renderWindow");
-    pRenderLayer = findFunctionBySymbol(pHandle, "renderLayer", "CHyprRenderer::renderLayer");
-    pRenderBackground = findFunctionBySymbol(pHandle, "renderBackground", "CHyprRenderer::renderBackground");
+    pRenderWindow = findFunctionBySymbol(pHandle, "renderWindow", "Render::IHyprRenderer::renderWindow");
+    pRenderLayer = findFunctionBySymbol(pHandle, "renderLayer", "Render::IHyprRenderer::renderLayer");
+    pRenderBackground = findFunctionBySymbol(pHandle, "renderBackground", "Render::IHyprRenderer::renderBackground");
     g_renderHooksReady = pRenderWindow && pRenderLayer;
 
     registerMonitors();

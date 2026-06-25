@@ -53,7 +53,7 @@ std::optional<CBox> CHyprspaceWidget::getOverviewWindowSnapshotBox(PHLWINDOW win
     return std::nullopt;
 }
 
-void CHyprspaceWidget::captureOverviewMonitorSnapshot(CFramebuffer* sourceFramebuffer, WORKSPACEID workspaceID) {
+void CHyprspaceWidget::captureOverviewMonitorSnapshot(SP<IFramebuffer> sourceFramebuffer, WORKSPACEID workspaceID) {
     if (!sourceFramebuffer || !sourceFramebuffer->isAllocated())
         return;
 
@@ -84,7 +84,7 @@ void CHyprspaceWidget::captureOverviewMonitorSnapshot(CFramebuffer* sourceFrameb
     glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prevReadFramebuffer);
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFramebuffer);
 
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, sourceFramebuffer->getFBID());
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, dc<Render::GL::CGLFramebuffer*>(sourceFramebuffer.get())->getFBID());
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, overviewMonitorSnapshot.getFBID());
     glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFramebuffer);
@@ -109,7 +109,7 @@ SP<CTexture> CHyprspaceWidget::getOverviewMonitorSnapshotTexture(PHLWORKSPACE wo
 CHyprspaceWidget::CHyprspaceWidget(uint64_t inOwnerID) {
     ownerID = inOwnerID;
 
-    curAnimationConfig = *g_pConfigManager->getAnimationPropertyConfig("windows");
+    curAnimationConfig = *::Config::animationTree()->getAnimationPropertyConfig("windows");
 
     // the fuck is pValues???
     curAnimation = *curAnimationConfig.pValues.lock();
@@ -260,7 +260,7 @@ void CHyprspaceWidget::hide() {
 }
 
 void CHyprspaceWidget::updateConfig() {
-    curAnimationConfig = *g_pConfigManager->getAnimationPropertyConfig("windows");
+    curAnimationConfig = *::Config::animationTree()->getAnimationPropertyConfig("windows");
 
     // the fuck is pValues???
     curAnimation = *curAnimationConfig.pValues.lock();

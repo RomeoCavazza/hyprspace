@@ -205,9 +205,9 @@ namespace {
                 ls->m_realSize->value() * scene.monitorSizeScaleFactor,
             });
 
-            g_pHyprOpenGL->m_renderData.clipBox = scene.contentBox;
+            g_pHyprRenderer->m_renderData.clipBox = scene.contentBox;
             renderLayerStub(ls.lock(), scene.owner, layerBox, time);
-            g_pHyprOpenGL->m_renderData.clipBox = CBox();
+            g_pHyprRenderer->m_renderData.clipBox = CBox();
         }
     }
 
@@ -220,7 +220,7 @@ namespace {
         textureData.tex          = snapshotTexture;
         textureData.box          = scene.contentBox;
         textureData.a            = 1.F;
-        textureData.damage       = g_pHyprOpenGL->m_renderData.damage;
+        textureData.damage       = g_pHyprRenderer->m_renderData.damage;
         textureData.clipBox      = scene.contentBox;
         textureData.flipEndFrame = true;
         g_pHyprRenderer->m_renderPass.add(makeUnique<CTexPassElement>(textureData));
@@ -326,9 +326,9 @@ namespace {
             if (!targetWindowBox.has_value())
                 return;
 
-            g_pHyprOpenGL->m_renderData.clipBox = scene.contentBox;
+            g_pHyprRenderer->m_renderData.clipBox = scene.contentBox;
             renderWindowStub(window, scene.owner, scene.workspace, *targetWindowBox, time);
-            g_pHyprOpenGL->m_renderData.clipBox = CBox();
+            g_pHyprRenderer->m_renderData.clipBox = CBox();
 
             if (trackInput)
                 trackOverviewWindowInputBox(windowBoxes, scene.owner, window, *targetWindowBox);
@@ -371,12 +371,12 @@ void CHyprspaceWidget::draw() {
 
     if (!g_pHyprOpenGL || !g_pHyprRenderer)
         return;
-    if (!g_pHyprOpenGL->m_renderData.pCurrentMonData)
+    if (!owner)
         return;
 
     const auto time = Time::steadyNow();
 
-    g_pHyprOpenGL->m_renderData.pCurrentMonData->blurFBShouldRender = true;
+    owner->m_blurFBShouldRender = true;
 
     int bottomInvert = 1;
     if (Config::onBottom) bottomInvert = -1;
@@ -388,7 +388,7 @@ void CHyprspaceWidget::draw() {
     widgetBox.x -= owner->m_position.x;
     widgetBox.y -= owner->m_position.y;
 
-    g_pHyprOpenGL->m_renderData.clipBox = CBox({0, 0}, owner->m_transformedSize);
+    g_pHyprRenderer->m_renderData.clipBox = CBox({0, 0}, owner->m_transformedSize);
 
     // unscaled and relative to owner
     //CBox damageBox = {0, (Config::onBottom * (owner->m_transformedSize.y - ((Config::panelHeight + Config::reservedArea)))) - (bottomInvert * curYOffset->value()), owner->m_transformedSize.x, (Config::panelHeight + Config::reservedArea) * owner->m_scale};
@@ -467,9 +467,9 @@ void CHyprspaceWidget::draw() {
                     trackSnapshotWorkspaceWindows(*this, workspaceScene, windowBoxes);
             } else {
                 if (contentBox.w > 0 && contentBox.h > 0 && pRenderBackground) {
-                    g_pHyprOpenGL->m_renderData.clipBox = contentBox;
+                    g_pHyprRenderer->m_renderData.clipBox = contentBox;
                     renderBackgroundStub(owner, contentBox);
-                    g_pHyprOpenGL->m_renderData.clipBox = CBox();
+                    g_pHyprRenderer->m_renderData.clipBox = CBox();
                     renderedWallpaper = true;
                 }
 

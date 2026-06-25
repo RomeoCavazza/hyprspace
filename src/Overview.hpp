@@ -3,6 +3,7 @@
 #include <hyprland/src/render/Framebuffer.hpp>
 #include <hyprutils/animation/AnimationConfig.hpp>
 #include <optional>
+#include "Globals.hpp"
 
 class CHyprspaceWidget {
     struct SWindowGeometrySnapshot {
@@ -80,7 +81,7 @@ public:
     void updateConfig();
 
     std::optional<CBox> getOverviewWindowSnapshotBox(PHLWINDOW window, PHLWORKSPACE workspace) const;
-    void                captureOverviewMonitorSnapshot(CFramebuffer* sourceFramebuffer, WORKSPACEID workspaceID);
+    void                captureOverviewMonitorSnapshot(SP<IFramebuffer> sourceFramebuffer, WORKSPACEID workspaceID);
     bool                hasOverviewMonitorSnapshot(PHLWORKSPACE workspace);
     SP<CTexture>        getOverviewMonitorSnapshotTexture(PHLWORKSPACE workspace);
 

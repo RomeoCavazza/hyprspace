@@ -1,7 +1,7 @@
 #include "Overview.hpp"
 #include "Globals.hpp"
 
-static CCssGapData getOverviewGapsOut(const CCssGapData& baseGapsOut, int panelOffset) {
+static ::Config::CCssGapData getOverviewGapsOut(const ::Config::CCssGapData& baseGapsOut, int panelOffset) {
     auto gapsOut = baseGapsOut;
 
     if (Config::onBottom)
@@ -18,14 +18,24 @@ void CHyprspaceWidget::updateLayout() {
     const auto pMonitor = getOwner();
     if (!pMonitor) return;
 
-    static auto PGAPSINDATA = CConfigValue<Hyprlang::CUSTOMTYPE>("general:gaps_in");
-    static auto PGAPSOUTDATA = CConfigValue<Hyprlang::CUSTOMTYPE>("general:gaps_out");
-    auto* const PGAPSIN = (CCssGapData*)(PGAPSINDATA.ptr())->getData();
-    auto* const PGAPSOUT = (CCssGapData*)(PGAPSOUTDATA.ptr())->getData();
+    if (g_configReloading) {
+        pMonitor->m_reservedArea = Desktop::CReservedArea();
+        g_pHyprRenderer->arrangeLayersForMonitor(ownerID);
+        g_layoutManager->invalidateMonitorGeometries(pMonitor);
+        return;
+    }
+
+    static auto PGAPSINDATA = CConfigValue<::Config::IComplexConfigValue>("general:gaps_in");
+    static auto PGAPSOUTDATA = CConfigValue<::Config::IComplexConfigValue>("general:gaps_out");
+
+    auto* const PGAPSIN = dynamic_cast<::Config::CCssGapData*>(PGAPSINDATA.ptr());
+    auto* const PGAPSOUT = dynamic_cast<::Config::CCssGapData*>(PGAPSOUTDATA.ptr());
+    if (!PGAPSIN || !PGAPSOUT)
+        return;
 
     const auto resetWorkspaceRule = [&](const PHLWORKSPACE& ws) {
         const auto curRules = std::to_string(ws->m_id) + ", gapsin:" + PGAPSIN->toString() + ", gapsout:" + PGAPSOUT->toString();
-        g_pConfigManager->handleWorkspaceRules("", curRules);
+        HyprspaceCompat::handleWorkspaceRules("", curRules);
     };
 
     // Never use monitor reserved areas for overview layout. In Hyprland they are
@@ -46,12 +56,12 @@ void CHyprspaceWidget::updateLayout() {
     }
 
     if (Config::affectStrut && active && pMonitor->m_activeWorkspace && !pMonitor->m_activeWorkspace->m_isSpecialWorkspace) {
-        auto gapsIn = Config::overrideGaps ? CCssGapData(Config::gapsIn) : *PGAPSIN;
-        auto gapsOutBase = Config::overrideGaps ? CCssGapData(Config::gapsOut) : *PGAPSOUT;
+        auto gapsIn = Config::overrideGaps ? ::Config::CCssGapData(Config::gapsIn) : *PGAPSIN;
+        auto gapsOutBase = Config::overrideGaps ? ::Config::CCssGapData(Config::gapsOut) : *PGAPSOUT;
         auto gapsOut = getOverviewGapsOut(gapsOutBase, currentHeight);
 
         const auto curRules = std::to_string(pMonitor->activeWorkspaceID()) + ", gapsin:" + gapsIn.toString() + ", gapsout:" + gapsOut.toString();
-        g_pConfigManager->handleWorkspaceRules("", curRules);
+        HyprspaceCompat::handleWorkspaceRules("", curRules);
     }
 
     g_layoutManager->invalidateMonitorGeometries(pMonitor);

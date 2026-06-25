@@ -3,6 +3,9 @@
 #include <hyprland/src/plugins/PluginAPI.hpp>
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/render/Renderer.hpp>
+#include <hyprland/src/render/OpenGL.hpp>
+#include <hyprland/src/config/shared/animation/AnimationTree.hpp>
+#include <hyprland/src/config/legacy/ConfigManager.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/layout/LayoutManager.hpp>
@@ -12,6 +15,27 @@
 #include <hyprland/src/config/ConfigValue.hpp>
 #include <hyprutils/signal/Signal.hpp>
 #include <tuple>
+
+using CFramebuffer = Render::GL::CGLFramebuffer;
+using CTexture = Render::ITexture;
+using IFramebuffer = Render::IFramebuffer;
+using Render::eRenderPassMode;
+using Render::SRenderModifData;
+inline constexpr Render::eRenderPassMode RENDER_PASS_ALL = Render::RENDER_PASS_ALL;
+inline constexpr Render::eRenderPassMode RENDER_PASS_MAIN = Render::RENDER_PASS_MAIN;
+using Render::GL::g_pHyprOpenGL;
+
+namespace HyprspaceCompat {
+    inline void handleWorkspaceRules(const std::string& key, const std::string& value) {
+        auto& configManager = ::Config::mgr();
+        if (!configManager || configManager->type() != ::Config::CONFIG_LEGACY)
+            return;
+
+        auto* legacyConfigManager = dynamic_cast<::Config::Legacy::CConfigManager*>(configManager.get());
+        if (legacyConfigManager)
+            legacyConfigManager->handleWorkspaceRules(key, value);
+    }
+}
 
 inline HANDLE pHandle = NULL;
 
@@ -25,6 +49,7 @@ extern void* pRenderLayer;
 typedef void (*tRenderBackground)(void*, PHLMONITOR);
 extern void* pRenderBackground;
 extern bool g_renderHooksReady;
+extern bool g_configReloading;
 namespace Config {
     extern CHyprColor panelBaseColor;
     extern CHyprColor panelBorderColor;
