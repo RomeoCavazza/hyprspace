@@ -11,7 +11,6 @@
 #include "Overview.hpp"
 #include "Globals.hpp"
 
-void* pMouseKeybind;
 void* pRenderWindow;
 void* pRenderLayer;
 void* pRenderBackground;
@@ -111,6 +110,7 @@ CHyprSignalListener g_pSwipeEndHook;
 CHyprSignalListener g_pKeyPressHook;
 CHyprSignalListener g_pSwitchWorkspaceHook;
 CHyprSignalListener g_pAddMonitorHook;
+CHyprSignalListener g_pStartHook;
 
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
@@ -587,9 +587,12 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE inHandle) {
     HyprlandAPI::addConfigValue(pHandle, "plugin:overview:dragAlpha", Hyprlang::FLOAT{0.2});
     HyprlandAPI::addConfigValue(pHandle, "plugin:overview:exitKey", Hyprlang::STRING{"Escape"});
 
-    HyprlandAPI::reloadConfig();
-    reloadConfig();
     g_pConfigReloadHook = Event::bus()->m_events.config.reloaded.listen([] { reloadConfig(); });
+    g_pStartHook = Event::bus()->m_events.start.listen([] {
+        reloadConfig();
+        registerMonitors();
+    });
+    HyprlandAPI::reloadConfig();
 
     HyprlandAPI::addDispatcherV2(pHandle, "overview:toggle", ::dispatchToggleOverview);
     HyprlandAPI::addDispatcherV2(pHandle, "overview:open", ::dispatchOpenOverview);
@@ -601,35 +604,55 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE inHandle) {
     g_pOpenLayerHook = Event::bus()->m_events.layer.opened.listen([](const PHLLS&) { g_layoutNeedsRefresh = true; });
     g_pCloseLayerHook = Event::bus()->m_events.layer.closed.listen([](const PHLLS&) { g_layoutNeedsRefresh = true; });
 
+    g_pMouseButtonHook = listenCancellable<IPointer::SButtonEvent>(Event::bus()->m_events.input.mouse.button, onMouseButton);
+    g_pMouseAxisHook = listenCancellable<IPointer::SAxisEvent>(Event::bus()->m_events.input.mouse.axis, onMouseAxis);
 
-    // CKeybindManager::mouse (names too generic bruh) (this is a private function btw)
-    pMouseKeybind = findFunctionBySymbol(pHandle, "mouse", "CKeybindManager::mouse");
+    g_pTouchDownHook = listenCancellable<ITouch::SDownEvent>(Event::bus()->m_events.input.touch.down, onTouchDown);
+    g_pTouchMoveHook = listenCancellable<ITouch::SMotionEvent>(Event::bus()->m_events.input.touch.motion, onTouchMove);
+    g_pTouchUpHook = listenCancellable<ITouch::SUpEvent>(Event::bus()->m_events.input.touch.up, onTouchUp);
 
-    g_pMouseButtonHook = Event::bus()->m_events.input.mouse.button.listen(onMouseButton);
-    g_pMouseAxisHook = Event::bus()->m_events.input.mouse.axis.listen(onMouseAxis);
+    g_pSwipeBeginHook = listenCancellable<IPointer::SSwipeBeginEvent>(Event::bus()->m_events.gesture.swipe.begin, onSwipeBegin);
+    g_pSwipeUpdateHook = listenCancellable<IPointer::SSwipeUpdateEvent>(Event::bus()->m_events.gesture.swipe.update, onSwipeUpdate);
+    g_pSwipeEndHook = listenCancellable<IPointer::SSwipeEndEvent>(Event::bus()->m_events.gesture.swipe.end, onSwipeEnd);
 
-    g_pTouchDownHook = Event::bus()->m_events.input.touch.down.listen(onTouchDown);
-    g_pTouchMoveHook = Event::bus()->m_events.input.touch.motion.listen(onTouchMove);
-    g_pTouchUpHook = Event::bus()->m_events.input.touch.up.listen(onTouchUp);
-
-    g_pSwipeBeginHook = Event::bus()->m_events.gesture.swipe.begin.listen(onSwipeBegin);
-    g_pSwipeUpdateHook = Event::bus()->m_events.gesture.swipe.update.listen(onSwipeUpdate);
-    g_pSwipeEndHook = Event::bus()->m_events.gesture.swipe.end.listen(onSwipeEnd);
-
-    g_pKeyPressHook = Event::bus()->m_events.input.keyboard.key.listen(onKeyPress);
+    g_pKeyPressHook = listenCancellable<IKeyboard::SKeyEvent>(Event::bus()->m_events.input.keyboard.key, onKeyPress);
 
     g_pSwitchWorkspaceHook = Event::bus()->m_events.workspace.active.listen(onWorkspaceChange);
 
     pRenderWindow = findFunctionBySymbol(pHandle, "renderWindow", "Render::IHyprRenderer::renderWindow");
+    if (!pRenderWindow)
+        pRenderWindow = findFunctionBySymbol(pHandle, "renderWindow", "CHyprRenderer::renderWindow");
     pRenderLayer = findFunctionBySymbol(pHandle, "renderLayer", "Render::IHyprRenderer::renderLayer");
+    if (!pRenderLayer)
+        pRenderLayer = findFunctionBySymbol(pHandle, "renderLayer", "CHyprRenderer::renderLayer");
     pRenderBackground = findFunctionBySymbol(pHandle, "renderBackground", "Render::IHyprRenderer::renderBackground");
+    if (!pRenderBackground)
+        pRenderBackground = findFunctionBySymbol(pHandle, "renderBackground", "CHyprRenderer::renderBackground");
     g_renderHooksReady = pRenderWindow && pRenderLayer;
 
     registerMonitors();
     g_pAddMonitorHook = Event::bus()->m_events.monitor.added.listen([](const PHLMONITOR&) { registerMonitors(); });
 
-    return {"Hyprspace", "Workspace overview", "KZdkm", "0.1"};
+    return {"Hyprspace", "Workspace overview - Romeo main port for Hyprland 0.55", "KZdkm+tco", "0.1-v055-romeo-main"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
+    g_pRenderHook.reset();
+    g_pConfigReloadHook.reset();
+    g_pOpenLayerHook.reset();
+    g_pCloseLayerHook.reset();
+    g_pMouseButtonHook.reset();
+    g_pMouseAxisHook.reset();
+    g_pTouchDownHook.reset();
+    g_pTouchMoveHook.reset();
+    g_pTouchUpHook.reset();
+    g_pSwipeBeginHook.reset();
+    g_pSwipeUpdateHook.reset();
+    g_pSwipeEndHook.reset();
+    g_pKeyPressHook.reset();
+    g_pSwitchWorkspaceHook.reset();
+    g_pAddMonitorHook.reset();
+    g_pStartHook.reset();
+
+    g_overviewWidgets.clear();
 }

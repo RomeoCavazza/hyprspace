@@ -14,7 +14,9 @@
 #include <hyprland/src/managers/animation/AnimationManager.hpp>
 #include <hyprland/src/config/ConfigValue.hpp>
 #include <hyprutils/signal/Signal.hpp>
+#include <functional>
 #include <tuple>
+#include <type_traits>
 
 using CFramebuffer = Render::GL::CGLFramebuffer;
 using CTexture = Render::ITexture;
@@ -24,6 +26,24 @@ using Render::SRenderModifData;
 inline constexpr Render::eRenderPassMode RENDER_PASS_ALL = Render::RENDER_PASS_ALL;
 inline constexpr Render::eRenderPassMode RENDER_PASS_MAIN = Render::RENDER_PASS_MAIN;
 using Render::GL::g_pHyprOpenGL;
+
+using SCallbackInfo = Event::SCallbackInfo;
+
+template <typename T>
+using HyprSignalRefArg = std::conditional_t<std::is_trivially_copyable_v<T>, T, const T&>;
+
+template <typename EventType, typename Signal>
+CHyprSignalListener listenCancellable(Signal& signal, std::function<void(const EventType&, SCallbackInfo&)> handler) {
+    struct Hack : Hyprutils::Signal::CSignalBase {
+        using CSignalBase::registerListenerInternal;
+    };
+
+    return reinterpret_cast<Hack&>(signal).registerListenerInternal([handler](void* args) {
+        using Tuple = std::tuple<HyprSignalRefArg<EventType>, HyprSignalRefArg<Event::SCallbackInfo&>>;
+        auto* tup   = static_cast<Tuple*>(args);
+        handler(std::get<0>(*tup), std::get<1>(*tup));
+    });
+}
 
 namespace HyprspaceCompat {
     inline void handleWorkspaceRules(const std::string& key, const std::string& value) {
@@ -38,9 +58,6 @@ namespace HyprspaceCompat {
 }
 
 inline HANDLE pHandle = NULL;
-
-typedef SDispatchResult (*tMouseKeybind)(std::string);
-extern void* pMouseKeybind;
 
 typedef void (*tRenderWindow)(void*, PHLWINDOW, PHLMONITOR, const Time::steady_tp&, bool, eRenderPassMode, bool, bool);
 extern void* pRenderWindow;

@@ -183,6 +183,13 @@ void renderBackgroundStub(PHLMONITOR pMonitor, CBox rectOverride) {
 }
 
 namespace {
+    CBox monitorClipBox(PHLMONITOR monitor) {
+        if (!monitor)
+            return {};
+
+        return CBox({0, 0}, monitor->m_transformedSize);
+    }
+
     struct SWorkspaceThumbnailScene {
         PHLMONITOR   owner = nullptr;
         PHLWORKSPACE workspace = nullptr;
@@ -207,7 +214,7 @@ namespace {
 
             g_pHyprRenderer->m_renderData.clipBox = scene.contentBox;
             renderLayerStub(ls.lock(), scene.owner, layerBox, time);
-            g_pHyprRenderer->m_renderData.clipBox = CBox();
+            g_pHyprRenderer->m_renderData.clipBox = monitorClipBox(scene.owner);
         }
     }
 
@@ -328,7 +335,7 @@ namespace {
 
             g_pHyprRenderer->m_renderData.clipBox = scene.contentBox;
             renderWindowStub(window, scene.owner, scene.workspace, *targetWindowBox, time);
-            g_pHyprRenderer->m_renderData.clipBox = CBox();
+            g_pHyprRenderer->m_renderData.clipBox = monitorClipBox(scene.owner);
 
             if (trackInput)
                 trackOverviewWindowInputBox(windowBoxes, scene.owner, window, *targetWindowBox);
@@ -388,7 +395,8 @@ void CHyprspaceWidget::draw() {
     widgetBox.x -= owner->m_position.x;
     widgetBox.y -= owner->m_position.y;
 
-    g_pHyprRenderer->m_renderData.clipBox = CBox({0, 0}, owner->m_transformedSize);
+    const CBox monitorClip = monitorClipBox(owner);
+    g_pHyprRenderer->m_renderData.clipBox = monitorClip;
 
     // unscaled and relative to owner
     //CBox damageBox = {0, (Config::onBottom * (owner->m_transformedSize.y - ((Config::panelHeight + Config::reservedArea)))) - (bottomInvert * curYOffset->value()), owner->m_transformedSize.x, (Config::panelHeight + Config::reservedArea) * owner->m_scale};
@@ -469,7 +477,7 @@ void CHyprspaceWidget::draw() {
                 if (contentBox.w > 0 && contentBox.h > 0 && pRenderBackground) {
                     g_pHyprRenderer->m_renderData.clipBox = contentBox;
                     renderBackgroundStub(owner, contentBox);
-                    g_pHyprRenderer->m_renderData.clipBox = CBox();
+                    g_pHyprRenderer->m_renderData.clipBox = monitorClip;
                     renderedWallpaper = true;
                 }
 
