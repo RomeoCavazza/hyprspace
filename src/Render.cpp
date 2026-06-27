@@ -2,6 +2,7 @@
 #include "Globals.hpp"
 #include <hyprland/src/render/pass/RectPassElement.hpp>
 #include <hyprland/src/render/pass/RendererHintsPassElement.hpp>
+#include <hyprland/src/render/pass/SurfacePassElement.hpp>
 #include <hyprland/src/render/pass/TexPassElement.hpp>
 #include <hyprlang.hpp>
 #include <hyprutils/utils/ScopeGuard.hpp>
@@ -61,62 +62,69 @@ void renderBorder(CBox box, CHyprColor color, int size) {
     }
 }
 
-void renderWindowStub(PHLWINDOW pWindow, PHLMONITOR pMonitor, PHLWORKSPACE pWorkspaceOverride, CBox rectOverride, const Time::steady_tp& time) {
-    if (!g_renderHooksReady || !pRenderWindow || !pWindow || !pMonitor || !pWorkspaceOverride)
+void renderWindowStub(PHLWINDOW pWindow, PHLMONITOR pMonitor, PHLWORKSPACE pWorkspaceOverride, CBox rectOverride, CBox clipBox, const Time::steady_tp& time) {
+    if (!pWindow || !pMonitor || !pWorkspaceOverride)
+        return;
+
+    if (!pWindow->m_isMapped || !pWindow->wlSurface() || !pWindow->wlSurface()->resource())
         return;
 
     SRenderModifData renderModif;
-
-    const auto oWorkspace = pWindow->m_workspace;
-    const auto oWorkspaceVisible = pWorkspaceOverride->m_visible;
-    const auto oWorkspaceForceRendering = pWorkspaceOverride->m_forceRendering;
-    const auto oFullscreen = pWindow->m_fullscreenState;
-    const auto oUseNearestNeighbor = pWindow->m_ruleApplicator->nearestNeighbor();
-    const auto oPinned = pWindow->m_pinned;
-    const auto oFloating = pWindow->m_isFloating;
     const auto oRealPosition = pWindow->m_realPosition->value();
-    const auto oSize = pWindow->m_realSize->value();
+    const auto oSize         = pWindow->m_realSize->value();
 
     if (!(oSize.x > 0) || !(pMonitor->m_scale > 0))
         return;
 
     const float curScaling = rectOverride.w / (oSize.x * pMonitor->m_scale);
-    if (!(curScaling > 0))
+    if (!(curScaling > 0) || !(rectOverride.w > 0 && rectOverride.h > 0))
         return;
 
-    // using renderModif struct to override the position and scale of windows
-    // this will be replaced by matrix transformations in hyprland
     renderModif.modifs.push_back(std::make_pair(SRenderModifData::eRenderModifType::RMOD_TYPE_TRANSLATE, std::any((pMonitor->m_position * pMonitor->m_scale) + (rectOverride.pos() / curScaling) - (oRealPosition * pMonitor->m_scale))));
     renderModif.modifs.push_back(std::make_pair(SRenderModifData::eRenderModifType::RMOD_TYPE_SCALE, std::any(curScaling)));
     renderModif.enabled = true;
-    pWindow->m_workspace = pWorkspaceOverride;
-    pWorkspaceOverride->m_visible = true;
-    pWorkspaceOverride->m_forceRendering = true;
-    pWindow->m_fullscreenState = Desktop::View::SFullscreenState{FSMODE_NONE};
-    pWindow->m_ruleApplicator->nearestNeighbor().set(false, Desktop::Types::PRIORITY_SET_PROP);
-    pWindow->m_isFloating = false;
-    pWindow->m_pinned = true;
-    pWindow->m_ruleApplicator->rounding().set(pWindow->rounding() * curScaling * pMonitor->m_scale, Desktop::Types::PRIORITY_SET_PROP);
 
     g_pHyprRenderer->m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{renderModif}));
-    // remove modif as it goes out of scope (wtf is this blackmagic i need to relearn c++)
     Hyprutils::Utils::CScopeGuard x([] {
         g_pHyprRenderer->m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{SRenderModifData{}}));
-        });
+    });
 
     g_pHyprRenderer->damageWindow(pWindow);
 
-    (*(tRenderWindow)pRenderWindow)(g_pHyprRenderer.get(), pWindow, pMonitor, time, true, RENDER_PASS_ALL, false, false);
+    CSurfacePassElement::SRenderData renderdata = {pMonitor, time};
+    renderdata.pos                              = oRealPosition + pWindow->m_floatingOffset;
+    renderdata.w                                = std::max(oSize.x, 5.0);
+    renderdata.h                                = std::max(oSize.y, 5.0);
+    renderdata.surface                          = pWindow->wlSurface()->resource();
+    renderdata.dontRound                        = pWindow->isEffectiveInternalFSMode(FSMODE_FULLSCREEN);
+    renderdata.fadeAlpha                        = 1.F;
+    renderdata.alpha                            = 1.F;
+    renderdata.decorate                         = false;
+    renderdata.rounding                         = renderdata.dontRound ? 0 : pWindow->rounding() * curScaling * pMonitor->m_scale;
+    renderdata.roundingPower                    = renderdata.dontRound ? 2.0F : pWindow->roundingPower();
+    renderdata.blur                             = false;
+    renderdata.pWindow                          = pWindow;
+    renderdata.clipBox                          = clipBox;
+    renderdata.useNearestNeighbor               = false;
+    renderdata.squishOversized                  = true;
+    renderdata.surfaceCounter                   = 0;
 
-    // restore values for normal window render
-    pWindow->m_workspace = oWorkspace;
-    pWorkspaceOverride->m_visible = oWorkspaceVisible;
-    pWorkspaceOverride->m_forceRendering = oWorkspaceForceRendering;
-    pWindow->m_fullscreenState = oFullscreen;
-    pWindow->m_ruleApplicator->rounding().unset(Desktop::Types::PRIORITY_SET_PROP);
-    pWindow->m_ruleApplicator->nearestNeighbor().unset(Desktop::Types::PRIORITY_SET_PROP);
-    pWindow->m_isFloating = oFloating;
-    pWindow->m_pinned = oPinned;
+    pWindow->wlSurface()->resource()->breadthfirst(
+        [&renderdata, &pWindow](SP<CWLSurfaceResource> surface, const Vector2D& offset, void*) {
+            if (!surface || !surface->m_current.texture)
+                return;
+
+            if (surface->m_current.size.x < 1 || surface->m_current.size.y < 1)
+                return;
+
+            renderdata.localPos    = offset;
+            renderdata.texture     = surface->m_current.texture;
+            renderdata.surface     = surface;
+            renderdata.mainSurface = surface == pWindow->wlSurface()->resource();
+            g_pHyprRenderer->m_renderPass.add(makeUnique<CSurfacePassElement>(renderdata));
+            renderdata.surfaceCounter++;
+        },
+        nullptr);
 }
 
 void renderLayerStub(PHLLS pLayer, PHLMONITOR pMonitor, CBox rectOverride, const Time::steady_tp& time) {
@@ -334,7 +342,7 @@ namespace {
                 return;
 
             g_pHyprRenderer->m_renderData.clipBox = scene.contentBox;
-            renderWindowStub(window, scene.owner, scene.workspace, *targetWindowBox, time);
+            renderWindowStub(window, scene.owner, scene.workspace, *targetWindowBox, scene.contentBox, time);
             g_pHyprRenderer->m_renderData.clipBox = monitorClipBox(scene.owner);
 
             if (trackInput)
