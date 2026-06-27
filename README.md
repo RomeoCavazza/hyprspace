@@ -1,6 +1,14 @@
 # Hyprspace
 
-A plugin for Hyprland that implements a workspace overview feature similar to that of KDE Plasma, GNOME and macOS, aimed to provide a efficient way of workspace and window management.
+> [!IMPORTANT]
+> This fork ports Hyprspace to Hyprland `v0.55.4`.
+> The current fork has been validated on Hyprland `v0.55.4` under NixOS `26.05 (Yarara)`.
+
+[![Build](https://github.com/RomeoCavazza/hyprspace/actions/workflows/build.yml/badge.svg)](https://github.com/RomeoCavazza/hyprspace/actions/workflows/build.yml)
+[![Release](https://github.com/RomeoCavazza/hyprspace/actions/workflows/release.yml/badge.svg)](https://github.com/RomeoCavazza/hyprspace/actions/workflows/release.yml)
+[![Hyprland](https://img.shields.io/badge/Hyprland-v0.55.4-58E1FF)](https://github.com/hyprwm/Hyprland/releases/tag/v0.55.4)
+
+A plugin for Hyprland that implements a workspace overview feature similar to that of KDE Plasma, GNOME and macOS, aimed to provide an efficient way of workspace and window management.
 
 > [!NOTE]
 > This plugin is still maintained, by combined efforts of me and all the awesome contributors. However, I do not have as much time that I could spend on this plugin as before, and Hyprland is a rapidly changing codebase. Therefore, at this time, I could not guarantee that new issues could be resolved promptly. I appreciate your acknowledgement and support for this project!
@@ -65,7 +73,7 @@ Then use `hyprctl plugin load` followed by the absolute path to the `.so` file t
 
 ### Hyprpm
 ```
-hyprpm add https://github.com/KZDKM/Hyprspace
+hyprpm add https://github.com/RomeoCavazza/Hyprspace
 hyprpm enable Hyprspace
 ```
 
@@ -82,7 +90,7 @@ Refer to the [Hyprland wiki](https://wiki.hyprland.org/Nix/Hyprland-on-Home-Mana
       inputs.nixpkgs.follows = "nixpkgs";
     };
     Hyprspace = {
-      url = "github:KZDKM/Hyprspace";
+      url = "github:RomeoCavazza/hyprspace/main";
 
       # Hyprspace uses latest Hyprland. We declare this to keep them in sync.
       inputs.hyprland.follows = "hyprland";
