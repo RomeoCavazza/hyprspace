@@ -175,16 +175,12 @@ void CHyprspaceWidget::show() {
     // FIXME: ensure input is disabled for hidden layers
     if (oLayerAlpha.empty() && Config::hideRealLayers) {
         for (auto& ls : owner->m_layerSurfaceLayers[2]) {
-            //ls->startAnimation(false);
             oLayerAlpha.emplace_back(std::make_tuple(ls.lock(), ls->m_alpha->goal()));
             *ls->m_alpha = 0.f;
-            ls->m_fadingOut = true;
         }
         for (auto& ls : owner->m_layerSurfaceLayers[3]) {
-            //ls->startAnimation(false);
             oLayerAlpha.emplace_back(std::make_tuple(ls.lock(), ls->m_alpha->goal()));
             *ls->m_alpha = 0.f;
-            ls->m_fadingOut = true;
         }
     }
 
@@ -207,23 +203,19 @@ void CHyprspaceWidget::hide() {
 
     // restore layer state
     for (auto& ls : owner->m_layerSurfaceLayers[2]) {
-        if (!ls->m_readyToDelete && ls->m_mapped && ls->m_fadingOut) {
+        if (!ls->m_readyToDelete && ls->m_mapped) {
             auto oAlpha = std::find_if(oLayerAlpha.begin(), oLayerAlpha.end(), [&] (const auto& tuple) {return std::get<0>(tuple) == ls;});
             if (oAlpha != oLayerAlpha.end()) {
-                ls->m_fadingOut = false;
                 *ls->m_alpha = std::get<1>(*oAlpha);
             }
-            //ls->startAnimation(true);
         }
     }
     for (auto& ls : owner->m_layerSurfaceLayers[3]) {
-        if (!ls->m_readyToDelete && ls->m_mapped && ls->m_fadingOut) {
+        if (!ls->m_readyToDelete && ls->m_mapped) {
             auto oAlpha = std::find_if(oLayerAlpha.begin(), oLayerAlpha.end(), [&] (const auto& tuple) {return std::get<0>(tuple) == ls;});
             if (oAlpha != oLayerAlpha.end()) {
-                ls->m_fadingOut = false;
                 *ls->m_alpha = std::get<1>(*oAlpha);
             }
-            //ls->startAnimation(true);
         }
     }
     oLayerAlpha.clear();
