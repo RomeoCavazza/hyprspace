@@ -98,7 +98,8 @@ void renderWindowStub(PHLWINDOW pWindow, PHLMONITOR pMonitor, PHLWORKSPACE pWork
     renderdata.surface                          = pWindow->wlSurface()->resource();
     renderdata.dontRound                        = pWindow->isEffectiveInternalFSMode(FSMODE_FULLSCREEN);
     renderdata.fadeAlpha                        = 1.F;
-    renderdata.alpha                            = 1.F;
+    // Thumbnail transforms are render hints; keep them out of opaque occlusion.
+    renderdata.alpha                            = 0.999F;
     renderdata.decorate                         = false;
     renderdata.rounding                         = renderdata.dontRound ? 0 : pWindow->rounding() * curScaling * pMonitor->m_scale;
     renderdata.roundingPower                    = renderdata.dontRound ? 2.0F : pWindow->roundingPower();

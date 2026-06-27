@@ -633,7 +633,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE inHandle) {
     registerMonitors();
     g_pAddMonitorHook = Event::bus()->m_events.monitor.added.listen([](const PHLMONITOR&) { registerMonitors(); });
 
-    return {"Hyprspace", "Workspace overview - Romeo main port for Hyprland 0.55", "KZdkm+tco", "0.1-v055-romeo-main.2"};
+    return {"Hyprspace", "Workspace overview - Romeo main port for Hyprland 0.55", "KZdkm+tco", "0.1-v055-romeo-main.3"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
