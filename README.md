@@ -1,9 +1,5 @@
 # Hyprspace
 
-> [!IMPORTANT]
-> This fork ports Hyprspace to Hyprland `v0.55.4`.
-> The current fork has been validated on Hyprland `v0.55.4` under NixOS `26.05 (Yarara)`.
-
 [![Build](https://github.com/RomeoCavazza/hyprspace/actions/workflows/build.yml/badge.svg)](https://github.com/RomeoCavazza/hyprspace/actions/workflows/build.yml)
 [![Release](https://github.com/RomeoCavazza/hyprspace/actions/workflows/release.yml/badge.svg)](https://github.com/RomeoCavazza/hyprspace/actions/workflows/release.yml)
 [![Hyprland](https://img.shields.io/badge/Hyprland-v0.55.4-58E1FF)](https://github.com/hyprwm/Hyprland/releases/tag/v0.55.4)
@@ -78,6 +74,11 @@ hyprpm enable Hyprspace
 ```
 
 ### Nix
+
+> [!IMPORTANT]
+> This fork ports Hyprspace to Hyprland `v0.55.4`.
+> The current fork has been validated on Hyprland `v0.55.4` under NixOS `26.05 (Yarara)`.
+
 Refer to the [Hyprland wiki](https://wiki.hyprland.org/Nix/Hyprland-on-Home-Manager/#plugins) on plugins, but your flake might look like this:
 ```nix
 {
