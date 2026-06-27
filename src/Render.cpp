@@ -390,6 +390,9 @@ void CHyprspaceWidget::draw() {
     if (!owner)
         return;
 
+    if (active)
+        hideRealLayersForOverview();
+
     const auto time = Time::steadyNow();
 
     owner->m_blurFBShouldRender = true;

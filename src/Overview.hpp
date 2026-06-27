@@ -63,6 +63,8 @@ class CHyprspaceWidget {
     void captureOverviewWindowSnapshots();
     void clearOverviewWindowSnapshots();
     void clearOverviewMonitorSnapshot();
+    void hideRealLayersForOverview();
+    void restoreRealLayersFromOverview();
 
 public:
 

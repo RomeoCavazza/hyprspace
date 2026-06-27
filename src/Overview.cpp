@@ -147,6 +147,43 @@ PHLMONITOR CHyprspaceWidget::getOwner() {
     return g_pCompositor->getMonitorFromID(ownerID);
 }
 
+void CHyprspaceWidget::hideRealLayersForOverview() {
+    if (!Config::hideRealLayers)
+        return;
+
+    auto owner = getOwner();
+    if (!owner)
+        return;
+
+    const auto hideLayer = [this](PHLLS layer) {
+        if (!layer || layer->m_readyToDelete || !layer->m_mapped)
+            return;
+
+        const auto savedAlpha = std::find_if(oLayerAlpha.begin(), oLayerAlpha.end(), [&](const auto& tuple) { return std::get<0>(tuple) == layer; });
+        if (savedAlpha == oLayerAlpha.end())
+            oLayerAlpha.emplace_back(std::make_tuple(layer, layer->m_alpha->goal()));
+
+        layer->m_alpha->setValueAndWarp(0.F);
+        *layer->m_alpha = 0.F;
+    };
+
+    for (auto& ls : owner->m_layerSurfaceLayers[2])
+        hideLayer(ls.lock());
+    for (auto& ls : owner->m_layerSurfaceLayers[3])
+        hideLayer(ls.lock());
+}
+
+void CHyprspaceWidget::restoreRealLayersFromOverview() {
+    for (auto& [layer, alpha] : oLayerAlpha) {
+        if (!layer || layer->m_readyToDelete)
+            continue;
+
+        *layer->m_alpha = alpha;
+    }
+
+    oLayerAlpha.clear();
+}
+
 void CHyprspaceWidget::show() {
     auto owner = getOwner();
     if (!owner) return;
@@ -171,18 +208,7 @@ void CHyprspaceWidget::show() {
         }
     }
 
-    // hide top and overlay layers
-    // FIXME: ensure input is disabled for hidden layers
-    if (oLayerAlpha.empty() && Config::hideRealLayers) {
-        for (auto& ls : owner->m_layerSurfaceLayers[2]) {
-            oLayerAlpha.emplace_back(std::make_tuple(ls.lock(), ls->m_alpha->goal()));
-            *ls->m_alpha = 0.f;
-        }
-        for (auto& ls : owner->m_layerSurfaceLayers[3]) {
-            oLayerAlpha.emplace_back(std::make_tuple(ls.lock(), ls->m_alpha->goal()));
-            *ls->m_alpha = 0.f;
-        }
-    }
+    hideRealLayersForOverview();
 
     active = true;
 
@@ -201,24 +227,7 @@ void CHyprspaceWidget::hide() {
     auto owner = getOwner();
     if (!owner) return;
 
-    // restore layer state
-    for (auto& ls : owner->m_layerSurfaceLayers[2]) {
-        if (!ls->m_readyToDelete && ls->m_mapped) {
-            auto oAlpha = std::find_if(oLayerAlpha.begin(), oLayerAlpha.end(), [&] (const auto& tuple) {return std::get<0>(tuple) == ls;});
-            if (oAlpha != oLayerAlpha.end()) {
-                *ls->m_alpha = std::get<1>(*oAlpha);
-            }
-        }
-    }
-    for (auto& ls : owner->m_layerSurfaceLayers[3]) {
-        if (!ls->m_readyToDelete && ls->m_mapped) {
-            auto oAlpha = std::find_if(oLayerAlpha.begin(), oLayerAlpha.end(), [&] (const auto& tuple) {return std::get<0>(tuple) == ls;});
-            if (oAlpha != oLayerAlpha.end()) {
-                *ls->m_alpha = std::get<1>(*oAlpha);
-            }
-        }
-    }
-    oLayerAlpha.clear();
+    restoreRealLayersFromOverview();
 
     // restore fullscreen state
     for (auto& fs : prevFullscreen) {
