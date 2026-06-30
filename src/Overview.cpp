@@ -111,7 +111,7 @@ CHyprspaceWidget::CHyprspaceWidget(uint64_t inOwnerID) {
 
     curAnimationConfig = *::Config::animationTree()->getAnimationPropertyConfig("windows");
 
-    // the fuck is pValues???
+    // Keep a writable copy of the animation config.
     curAnimation = *curAnimationConfig.pValues.lock();
     *curAnimationConfig.pValues.lock() = curAnimation;
 
@@ -140,7 +140,6 @@ CHyprspaceWidget::CHyprspaceWidget(uint64_t inOwnerID) {
     workspaceScrollOffset->setValueAndWarp(0);
 }
 
-// TODO: implement deconstructor and delete widget on monitor unplug
 CHyprspaceWidget::~CHyprspaceWidget() {}
 
 PHLMONITOR CHyprspaceWidget::getOwner() {
@@ -192,15 +191,11 @@ void CHyprspaceWidget::show() {
         captureOverviewWindowSnapshots();
 
     if (prevFullscreen.empty()) {
-        // unfullscreen all windows
         for (auto& ws : g_pCompositor->getWorkspaces()) {
             if (ws->m_monitor->m_id == ownerID) {
                 const auto w = ws->getFullscreenWindow();
                 if (w != nullptr && ws->m_fullscreenMode != FSMODE_NONE) {
-                    // use fakefullscreenstate to preserve client's internal state
-                    // fixes youtube fullscreen not restoring properly
                     if (ws->m_fullscreenMode == FSMODE_FULLSCREEN) w->m_wantsInitialFullscreen = true;
-                    // we use the getWindowFromHandle function to prevent dangling pointers
                     prevFullscreen.emplace_back(std::make_tuple(PHLWINDOWREF(w), ws->m_fullscreenMode));
                     g_pCompositor->setWindowFullscreenState(w, Desktop::View::SFullscreenState{.internal = FSMODE_NONE, .client = FSMODE_NONE});
                 }
@@ -212,7 +207,6 @@ void CHyprspaceWidget::show() {
 
     active = true;
 
-    // panel offset should be handled by swipe event when swiping
     if (!swiping) {
         *curYOffset = 0;
         curSwipeOffset = (Config::panelHeight + Config::reservedArea) * owner->m_scale;
@@ -229,7 +223,6 @@ void CHyprspaceWidget::hide() {
 
     restoreRealLayersFromOverview();
 
-    // restore fullscreen state
     for (auto& fs : prevFullscreen) {
         const auto w = std::get<0>(fs).lock();
         if (!w) continue;
@@ -242,7 +235,6 @@ void CHyprspaceWidget::hide() {
 
     active = false;
 
-    // panel offset should be handled by swipe event when swiping
     if (!swiping) {
         *curYOffset = (Config::panelHeight + Config::reservedArea) * owner->m_scale;
         curSwipeOffset = -10.;
@@ -263,7 +255,7 @@ void CHyprspaceWidget::hide() {
 void CHyprspaceWidget::updateConfig() {
     curAnimationConfig = *::Config::animationTree()->getAnimationPropertyConfig("windows");
 
-    // the fuck is pValues???
+    // Keep a writable copy of the animation config.
     curAnimation = *curAnimationConfig.pValues.lock();
     *curAnimationConfig.pValues.lock() = curAnimation;
 

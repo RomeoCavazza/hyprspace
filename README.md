@@ -6,10 +6,8 @@
 
 A plugin for Hyprland that implements a workspace overview feature similar to that of KDE Plasma, GNOME and macOS, aimed to provide an efficient way of workspace and window management.
 
-> [!NOTE]
-> This plugin is still maintained, by combined efforts of me and all the awesome contributors. However, I do not have as much time that I could spend on this plugin as before, and Hyprland is a rapidly changing codebase. Therefore, at this time, I could not guarantee that new issues could be resolved promptly. I appreciate your acknowledgement and support for this project!
-> 
-> P.S.: I could recommend giving [niri](https://github.com/YaLTeR/niri) a try for anyone who is considering an alternative to Hyprland. It is a scrolling window manager that offers a great built-in overview feature that allows dragging windows in-between workspaces just like this plugin does. It also has better workspace management as it cleans up empty workspaces like GNOME does.
+This fork tracks a fast-moving Hyprland API. Compatibility is pinned to the
+version listed below and may require source updates for newer Hyprland releases.
 
 https://github.com/KZDKM/Hyprspace/assets/41317840/ed1a585a-30d5-4a79-a6da-8cc0713828f9
 
@@ -75,15 +73,13 @@ hyprpm enable Hyprspace
 
 ### Nix
 
-> [!IMPORTANT]
-> This fork ports Hyprspace to Hyprland `v0.55.4`.
-> The current fork has been validated on Hyprland `v0.55.4` under NixOS `26.05 (Yarara)`.
+This fork ports Hyprspace to Hyprland `v0.55.4` and has been validated under
+NixOS `26.05 (Yarara)`.
 
 Refer to the [Hyprland wiki](https://wiki.hyprland.org/Nix/Hyprland-on-Home-Manager/#plugins) on plugins, but your flake might look like this:
 ```nix
 {
   inputs = {
-    # Hyprland is **such** eye candy
     hyprland = {
       type = "git";
       url = "https://github.com/hyprwm/Hyprland";
@@ -93,15 +89,13 @@ Refer to the [Hyprland wiki](https://wiki.hyprland.org/Nix/Hyprland-on-Home-Mana
     Hyprspace = {
       url = "github:RomeoCavazza/hyprspace/main";
 
-      # Hyprspace uses latest Hyprland. We declare this to keep them in sync.
       inputs.hyprland.follows = "hyprland";
     };
   };
 
-... # your normal setup with hyprland
+... # Hyprland module setup
 
   wayland.windowManager.hyprland.plugins = [
-    # ... whatever
     inputs.Hyprspace.packages.${pkgs.system}.Hyprspace
   ];
 }

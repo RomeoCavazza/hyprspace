@@ -155,7 +155,7 @@ void renderLayerStub(PHLLS pLayer, PHLMONITOR pMonitor, CBox rectOverride, const
     pLayer->m_fadingOut = false;
 
     g_pHyprRenderer->m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{renderModif}));
-    // remove modif as it goes out of scope (wtf is this blackmagic i need to relearn c++)
+    // Reset render modifiers when the scoped pass completes.
     Hyprutils::Utils::CScopeGuard x([] {
         g_pHyprRenderer->m_renderPass.add(makeUnique<CRendererHintsPassElement>(CRendererHintsPassElement::SData{SRenderModifData{}}));
         });
@@ -371,7 +371,7 @@ namespace {
     }
 }
 
-// NOTE: rects and clipbox positions are relative to the monitor, while damagebox and layers are not, what the fuck? xd
+// Rects and clip boxes are monitor-relative; damage boxes and layers are not.
 void CHyprspaceWidget::draw() {
 
     workspaceBoxes.clear();
@@ -400,20 +400,14 @@ void CHyprspaceWidget::draw() {
     int bottomInvert = 1;
     if (Config::onBottom) bottomInvert = -1;
 
-    // Background box
-    CBox widgetBox = {owner->m_position.x, owner->m_position.y + (Config::onBottom * (owner->m_transformedSize.y - ((Config::panelHeight + Config::reservedArea) * owner->m_scale))) - (bottomInvert * curYOffset->value()), owner->m_transformedSize.x, (Config::panelHeight + Config::reservedArea) * owner->m_scale}; //TODO: update size on monitor change
+    CBox widgetBox = {owner->m_position.x, owner->m_position.y + (Config::onBottom * (owner->m_transformedSize.y - ((Config::panelHeight + Config::reservedArea) * owner->m_scale))) - (bottomInvert * curYOffset->value()), owner->m_transformedSize.x, (Config::panelHeight + Config::reservedArea) * owner->m_scale};
 
-    // set widgetBox relative to current monitor for rendering panel
     widgetBox.x -= owner->m_position.x;
     widgetBox.y -= owner->m_position.y;
 
     const CBox monitorClip = monitorClipBox(owner);
     g_pHyprRenderer->m_renderData.clipBox = monitorClip;
 
-    // unscaled and relative to owner
-    //CBox damageBox = {0, (Config::onBottom * (owner->m_transformedSize.y - ((Config::panelHeight + Config::reservedArea)))) - (bottomInvert * curYOffset->value()), owner->m_transformedSize.x, (Config::panelHeight + Config::reservedArea) * owner->m_scale};
-
-    //owner->addDamage(damageBox);
     g_pHyprRenderer->damageMonitor(owner);
     g_pHyprRenderer->damageMonitor(owner);
 

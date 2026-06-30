@@ -12,7 +12,6 @@ static ::Config::CCssGapData getOverviewGapsOut(const ::Config::CCssGapData& bas
     return gapsOut;
 }
 
-// FIXME: preserve original workspace rules
 void CHyprspaceWidget::updateLayout() {
     const auto currentHeight = Config::panelHeight + Config::reservedArea;
     const auto pMonitor = getOwner();
